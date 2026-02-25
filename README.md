@@ -1,7 +1,7 @@
 # WAAR_MAS
 
-##Grid
-...
+# Grid
+```
 
 TEAM LEVEL - rule-based(MVP)
 ┌──────────────────────────────────────────────┐
