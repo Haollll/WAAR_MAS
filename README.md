@@ -19,7 +19,7 @@ The objective of MAS system is to enable 4 drones to:
 - Failure detection & recovery
 - Drift correction for coverage maintenance
 - Rolling safe-path generation
-- Operational mode switching (Survey → Converge)
+- Operational mode switching (Mission reassign)
 
 #ROS2 archeitecture
 
