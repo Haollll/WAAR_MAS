@@ -27,7 +27,7 @@ On the other hand, adopting a learning-based method is not very feasible for a m
 Therefore, we have to rely on scattered online resources and LLMs to piece things together. 
 
 ## ROS2 archeitecture
-
+```
 iarc_ws/
 └── src/
     ├── mission10_msgs/                         (shared interfaces)
@@ -78,6 +78,7 @@ iarc_ws/
         ├── config/                             (optional: plugins/sensors)
         └── launch/
             └── sim.launch.py                   (spawn 4 drones + bridge)
+```
 ## Grid
 MVP
 ```
@@ -135,3 +136,4 @@ TEAM OUTPUT
 │  ↓                                           │
 │ possible paths + optimum safe path           │
 └──────────────────────────────────────────────┘
+```
