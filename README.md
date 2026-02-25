@@ -1,5 +1,37 @@
 # WAAR_MAS
 
+# Multi-Agent Coordination Framework
+
+## Overview
+
+This repository implements the **team-level coordination and safe path planning system** for IARC Mission 10.
+
+We are currently targeting a **4 Explorer configuration (MVP)** using:
+
+- ROS2 (Humble)
+- Gazebo simulation
+- Rule-based multi-agent coordination
+- GPS-based arena reference (~1.5m resolution)
+- Deployment-ready architecture for Raspberry Pi
+
+The objective is to enable 4 drones to:
+
+- Divide the exploration area
+- Perform parallel coverage
+- Avoid collisions
+- Handle drone failures
+- Maintain coverage despite GPS drift
+- Produce rolling team-level outputs (collective map + safe paths)
+
+---
+
+# 🧠 Responsibility Split
+
+## 🔹 K – Per-Drone Autonomy (Single-Agent Stack)
+
+Each drone runs its own autonomy pipeline:
+
+
 # Grid
 MVP
 ```
