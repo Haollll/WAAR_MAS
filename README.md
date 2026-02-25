@@ -11,17 +11,19 @@ We are currently targeting a **4 Explorer configuration (MVP)** using:
 - GPS-based arena reference (~1.5m resolution)
 - Deployment-ready architecture for Raspberry Pi
 
-The objective is to enable 4 drones to:
+The objective of MAS system is to enable 4 drones to:
 
-- Divide the exploration area
-- Perform parallel coverage
-- Avoid collisions
-- Handle drone failures
-- Maintain coverage despite GPS drift
-- Produce rolling team-level outputs (collective map + safe paths)
+- Region partitioning (strip assignment)
+- Dynamic reassignment
+- Collision avoidance between drones
+- Failure detection & recovery
+- Drift correction for coverage maintenance
+- Rolling safe-path generation
+- Operational mode switching (Survey → Converge)
 
+#ROS2 archeitecture
 
-# Grid
+## Grid
 MVP
 ```
 
