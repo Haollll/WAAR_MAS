@@ -93,34 +93,34 @@ iarc_ws/
     │   │   ├── PoseLite.msg
     │   │   ├── Coverage.msg
     │   │   ├── Assignment.msg
-    │   │   ├── MineDet.msg              (optional)
-    │   │   ├── MineDetArray.msg         (optional)
-    │   │   ├── MineBelief.msg           (recommended)
-    │   │   ├── MineBeliefArray.msg      (recommended)
-    │   │   ├── Path2D.msg               (optional)
-    │   │   └── Path2DArray.msg          (optional)
+    │   │   ├── MineDet.msg              (
+    │   │   ├── MineDetArray.msg    
+    │   │   ├── MineBelief.msg           
+    │   │   ├── MineBeliefArray.msg      
+    │   │   ├── Path2D.msg               
+    │   │   └── Path2DArray.msg        
     │   ├── CMakeLists.txt
     │   └── package.xml
     │
     ├── mission10_agent/                        (per-drone autonomy, Kevin)
     │   ├── mission10_agent/
-    │   │   ├── explorer_node.py
-    │   │   ├── frontier.py
-    │   │   ├── planner_astar.py
-    │   │   └── tracker.py
+    │   │   ├── explorer_node.py     （ASSUMED)
+    │   │   ├── frontier.py          （ASSUMED)
+    │   │   ├── planner_astar.py     （ASSUMED)
+    │   │   └── tracker.py           （ASSUMED)
     │   ├── launch/
     │   │   └── explorer.launch.py
     │   ├── setup.py
     │   └── package.xml
     │
-    ├── mission10_coordinator/                  (team-level, H)
+    ├── mission10_coordinator/                  (team-level)
     │   ├── mission10_coordinator/
-    │   │   ├── team_coordinator_node.py        (required)
+    │   │   ├── team_coordinator_node.py       
     │   │   ├── strip_partition.py
     │   │   ├── safety_shield.py
     │   │   ├── fault_manager.py
-    │   │   ├── belief_fusion_node.py           (recommended)
-    │   │   └── team_planner_node.py            (optional)
+    │   │   ├── belief_fusion_node.py      
+    │   │   └── team_planner_node.py        
     │   ├── launch/
     │   │   └── mission10_sim.launch.py
     │   ├── setup.py
@@ -133,8 +133,8 @@ iarc_ws/
         │   ├── mines/
         │   ├── trees/
         │   └── obstacles/
-        ├── config/                             (optional: plugins/sensors)
+        ├── config/    
         └── launch/
-            └── sim.launch.py                   (spawn 4 drones + bridge)
+            └── sim.launch.py                   (spawn 4 drones)
 ```
 
