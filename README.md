@@ -1,9 +1,10 @@
 # WAAR_MAS
 
 # Grid
+MVP
 ```
 
-TEAM LEVEL - rule-based(MVP)
+TEAM LEVEL - rule-based
 ┌──────────────────────────────────────────────┐
 │ Strip Coordinator (macro assignment)         │
 │ - 4 strips fixed partition (A/B/C/D)         │
