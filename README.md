@@ -24,7 +24,7 @@ The objective of MAS system is to enable 4 drones to:
 ## ROS2 archeitecture
 
 ## Challenge
-We decided to use a rule-based approach for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
+We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
 On the other hand, adopting a learning-based method is not very feasible for a minimum viable product (MVP), and it would significantly increase the complexity.
 Therefore, we have to rely on scattered online resources and LLMs to piece things together. 
 
