@@ -21,13 +21,63 @@ The objective of MAS system is to enable 4 drones to:
 - Rolling safe-path generation
 - Operational mode switching (Mission reassign)
 
-## ROS2 archeitecture
-
 ## Challenge
 We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
 On the other hand, adopting a learning-based method is not very feasible for a minimum viable product (MVP), and it would significantly increase the complexity.
 Therefore, we have to rely on scattered online resources and LLMs to piece things together. 
 
+## ROS2 archeitecture
+
+iarc_ws/
+└── src/
+    ├── mission10_msgs/                         (shared interfaces)
+    │   ├── msg/
+    │   │   ├── PoseLite.msg
+    │   │   ├── Coverage.msg
+    │   │   ├── Assignment.msg
+    │   │   ├── MineDet.msg              (optional)
+    │   │   ├── MineDetArray.msg         (optional)
+    │   │   ├── MineBelief.msg           (recommended)
+    │   │   ├── MineBeliefArray.msg      (recommended)
+    │   │   ├── Path2D.msg               (optional)
+    │   │   └── Path2DArray.msg          (optional)
+    │   ├── CMakeLists.txt
+    │   └── package.xml
+    │
+    ├── mission10_agent/                        (per-drone autonomy, Kevin)
+    │   ├── mission10_agent/
+    │   │   ├── explorer_node.py
+    │   │   ├── frontier.py
+    │   │   ├── planner_astar.py
+    │   │   └── tracker.py
+    │   ├── launch/
+    │   │   └── explorer.launch.py
+    │   ├── setup.py
+    │   └── package.xml
+    │
+    ├── mission10_coordinator/                  (team-level, H)
+    │   ├── mission10_coordinator/
+    │   │   ├── team_coordinator_node.py        (required)
+    │   │   ├── strip_partition.py
+    │   │   ├── safety_shield.py
+    │   │   ├── fault_manager.py
+    │   │   ├── belief_fusion_node.py           (recommended)
+    │   │   └── team_planner_node.py            (optional)
+    │   ├── launch/
+    │   │   └── mission10_sim.launch.py
+    │   ├── setup.py
+    │   └── package.xml
+    │
+    └── mission10_sim/                          (gazebo integration)
+        ├── worlds/
+        │   └── mission10.world  (or .sdf)
+        ├── models/
+        │   ├── mines/
+        │   ├── trees/
+        │   └── obstacles/
+        ├── config/                             (optional: plugins/sensors)
+        └── launch/
+            └── sim.launch.py                   (spawn 4 drones + bridge)
 ## Grid
 MVP
 ```
