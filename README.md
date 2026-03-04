@@ -29,60 +29,67 @@ Therefore, we have to rely on scattered online resources and LLMs to piece thing
 ## Grid
 MVP
 ```
-
-TEAM LEVEL - rule-based
-┌──────────────────────────────────────────────┐
-│ Strip Coordinator (macro assignment)         │
-│ - 4 strips fixed partition (A/B/C/D)         │
-│ - progress monitor + fault takeover          │
-│ - collision/frequency/safety constraints     │
-└───────────────┬──────────────────────────────┘
-                │ Assignment: which strip, constraints
-                ▼
-PER-DRONE LEVEL (Kevin)
-┌──────────────────────────────────────────────┐
-│                ┌────────────────────┐        │
-│                │    Mission Layer   │        │ 
-│                │  (Build Safe Path) │        │
-│                └─────────┬──────────┘        │ 
-│                          │                   │
-│                ┌─────────▼──────────┐        │ 
-│                │ Corridor Planner   │        │
-│                │  (Human-safe path) │        │
-│                └─────────┬──────────┘        │
-│                          │                   │
-│                ┌─────────▼──────────┐        │
-│                │ Exploration Policy │        │
-│                │ (Which macro cell?)│        │
-│                └─────────┬──────────┘        │
-│                          │                   │
-│                ┌─────────▼──────────┐        │
-│                │  Belief / Risk Map │        │
-│                │  mine density      │        │
-│                │  obstacle density  │        │
-│                │  uncertainty       │        │
-│                └─────────┬──────────┘        │
-│                          │                   │
-│                ┌─────────▼──────────┐        │
-│                │   Sensor Layer     │        │
-│                │ (10 sec scanning)  │        │
-│                └─────────┬──────────┘        │
-│                          │                   │
-│                ┌─────────▼──────────┐        │
-│                │  Ground Truth Map  │        │
-│                └────────────────────┘        │
-│                                              │
-└───────────────┬──────────────────────────────┘
-                │ Local belief/coverage summary
-                ▼
-TEAM OUTPUT
-┌──────────────────────────────────────────────┐
-│ Collective Fusion (merge 4 drones)           │
-│  ↓                                           │
-│ Corridor Planner / Mission Layer (team)      │
-│  ↓                                           │
-│ possible paths + optimum safe path           │
-└──────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                               Mission Layer (Per-Drone)                       │
+│   Goal: maximize coverage + produce reliable mine beliefs + endgame verify    │
+│                                                                               │
+│   State Machine: BOOT → SURVEY → VERIFY_TAG → CONVERGE → FINISH               │
+│                                                                               │
+│   Behavior Tree (priority):                                                   │
+│     1) Safety / Collision Guard                                               │
+│     2) Geofence + Time Guard                                                  │
+│     3) Failure Monitor                                                        │
+│     4) Task Executor (VERIFY / RESCAN)                                        │
+│     5) Exploration Policy (frontier)                                          │
+│     6) P2P Sync Manager (neighbor sessions)                                   │
+└───────────────────────────────────────────────────────────────────────────────┘
+                 ▲                     ▲                     ▲
+                 │ task_cmd            │ local belief         │ status
+                 │ (interrupt)         │ (fused)              │ (health)
+                 │                     │                     │
+┌────────────────┴─────────────────────┴─────────────────────┴──────────────────┐
+│                         Coordination Layer (Fully P2P)                        │
+│     (No central controller; every drone runs identical coordination logic)    │
+│                                                                               │
+│  A) Neighbor Graph (from pose beacons)                                        │
+│     - edge(i,j) if dist(i,j) < R_enter; remove if dist(i,j) > R_exit          │
+│                                                                               │
+│  B) Sync Window Protocol (Scheme B)                                           │
+│     - hello/ack handshake → SYNC_ACTIVE(T_sync)                               │
+│     - exchange missing deltas (mine/tile) with seq + TTL + dedup cache        │
+│                                                                               │
+│  C) Decentralized Task Auction                                                │
+│     - announce(task) → claims(cost) → winner executes → result broadcast      │
+│     - tasks: VERIFY_TAG, RESCAN, BECOME_VERIFIER (endgame)                    │
+│                                                                               │
+│  Shared ROS2 Topics (FastDDS):                                                │
+│    /team/pose_beacon   /team/sync_hello  /team/sync_ack                       │
+│    /team/mine_delta    /team/tile_delta (opt)                                 │
+│    /team/task_announce /team/task_claim  /team/task_result                    │
+└───────────────────────────────────────────────────────────────────────────────┘
+                 ▲                     ▲                     ▲
+                 │ pose/sensors         │ detections           │ map updates
+                 │                      │                      │
+┌────────────────┴─────────────────────┴─────────────────────┴─────────────────┐
+│                         Per-Drone Autonomy Layer (x4)                        │
+│                                                                              │
+│  explorer_node (Kevin)                                                       │
+│   - SLAM/VIO (or sim pose)                                                   │
+│   - occupancy grid update                                                    │
+│   - frontier selection (local belief-driven)                                 │
+│   - A* to chosen frontier                                                    │
+│   - tracking                                                                 │
+│                                                                              │
+│  Optional local mapping/detector                                             │
+│   - mine candidate detection → triggers task announce                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+                 ▲
+                 │
+┌────────────────┴─────────────────────────────────────────────────────────────┐
+│                               Simulation Layer                               │
+│                           Gazebo + ROS2 Bridges                              │
+│                  (world models, mines, obstacles, sensors)                   │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 ## ROS2 archeitecture
 ```
