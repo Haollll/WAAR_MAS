@@ -5,7 +5,7 @@
 ### 1. `explorer_node` (Kevin - Skipp what he did here)
 ---
 
-### 2. `p2p_sync_node` (You)
+### 2. `p2p_sync_node` 
 
 * Implements **Scheme B sync window**: neighbor graph + hello/ack + missing delta exchange
 
@@ -32,7 +32,7 @@
 
 ---
 
-### 3. `p2p_task_node` (You)
+### 3. `p2p_task_node` 
 
 * Fully **P2P task auction system**
 
