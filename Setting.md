@@ -2,9 +2,7 @@
 
 **Each drone (×4)**
 
-### 1. `explorer_node` (Kevin)
-
-Skipp what he did here
+### 1. `explorer_node` (Kevin - Skipp what he did here)
 ---
 
 ### 2. `p2p_sync_node` (You)
