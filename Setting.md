@@ -274,7 +274,7 @@ uncertainty_along_path high
 * `VERIFY_PATH_SEGMENT`
 * `RESCAN_PATH_BUFFER`
 
-💡 **MVP recommendation**
+**MVP**
 
 Select **1 drone as Path Verifier**,
 while the other **3 continue exploration / gap filling**.
@@ -468,7 +468,7 @@ RESCAN_PATH_BUFFER
 
 ---
 
-# D) Suggested Time Thresholds (Simulation Friendly)
+# D) Suggested Time Thresholds
 
 Example parameters:
 
