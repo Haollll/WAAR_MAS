@@ -21,11 +21,6 @@ The objective of MAS system is to enable 4 drones to:
 - Rolling safe-path generation
 - Operational mode switching (Mission reassign)
 
-## Challenge
-We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
-On the other hand, adopting a learning-based method is not very feasible for a minimum viable product (MVP), and it would significantly increase the complexity, also only four drones is not ideal to use GNN.
-Therefore, we have to rely on scattered online resources to piece things together. 
-
 ## Core Idea
 The coordination strategy is based on a fully decentralized multi-agent architecture.
 - Information sharing follows a neighbor-based diffusion process similar to gossip protocols in distributed systems.
@@ -151,3 +146,7 @@ iarc_ws/
             └── sim.launch.py                   (spawn 4 drones)
 ```
 
+## Challenge
+We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
+On the other hand, adopting a learning-based method is not very feasible for a minimum viable product (MVP), and it would significantly increase the complexity, also only four drones is not ideal to use GNN.
+Therefore, we have to rely on scattered online resources to piece things together. 
