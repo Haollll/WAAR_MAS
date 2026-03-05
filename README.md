@@ -25,7 +25,7 @@ The objective of MAS system is to enable 4 drones to:
 The coordination strategy is based on a fully decentralized multi-agent architecture.
 - Information sharing follows a neighbor-based diffusion process similar to gossip protocols in distributed systems.
 - Task allocation is implemented using a distributed auction mechanism, where agents independently compute task costs and compete through a claim process.
-- Local decision making is implemented using a behavior-based control architecture, allowing reactive and robust operation without centralized planning.
+- Local decision making is implemented using a state machine / behavior-based control architecture, allowing reactive and robust operation without centralized planning.
 
 ## Grid
 MVP
