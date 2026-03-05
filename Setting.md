@@ -495,6 +495,3 @@ Meaning:
 * Enter **CONVERGE** when **90 seconds remain**
 * Freeze system **10 seconds before the end**
 
----
-
-如果你願意，我也可以幫你把這一整段 **直接整理成 GitHub README 格式（含架構圖 + ROS2 topic graph）**，這樣你們 mission system repo 可以直接用。
