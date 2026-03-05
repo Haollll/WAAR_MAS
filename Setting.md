@@ -4,14 +4,7 @@
 
 ### 1. `explorer_node` (Kevin)
 
-* Performs **frontier-based exploration / local planning / trajectory tracking**
-* **Subscribes:** `/drone_i/task_cmd`, `/drone_i/mode`
-  (mode can also be merged into `task_cmd`)
-* **Publishes:**
-  `/team/pose_beacon`
-  (optional) `/drone_i/mine_candidates`
-  `/drone_i/status`
-
+Skipp what he did here
 ---
 
 ### 2. `p2p_sync_node` (You)
