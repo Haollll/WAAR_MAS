@@ -34,7 +34,7 @@ MVP
 │                               Mission Layer (Per-Drone)                       │
 │   Goal: maximize coverage + produce reliable mine beliefs + endgame verify    │
 │                                                                               │
-│   State Machine: BOOT → SURVEY → VERIFY_TAG → CONVERGE → FINISH               │
+│   State Machine: BOOT → SURVEY → VERIFY_TAG → PATH_VERIFY → CONVERGE → FINISH │
 │                                                                               │
 │   Behavior Tree (priority):                                                   │
 │     1) Safety / Collision Guard                                               │
