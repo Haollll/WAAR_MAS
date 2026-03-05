@@ -94,56 +94,63 @@ MVP
 ```
 ## ROS2 archeitecture
 ```
-iarc_ws/
-└── src/
-    ├── mission10_msgs/                         (shared interfaces)
-    │   ├── msg/
-    │   │   ├── PoseLite.msg
-    │   │   ├── Coverage.msg
-    │   │   ├── Assignment.msg
-    │   │   ├── MineDet.msg              (
-    │   │   ├── MineDetArray.msg    
-    │   │   ├── MineBelief.msg           
-    │   │   ├── MineBeliefArray.msg      
-    │   │   ├── Path2D.msg               
-    │   │   └── Path2DArray.msg        
-    │   ├── CMakeLists.txt
-    │   └── package.xml
-    │
-    ├── mission10_agent/                        (per-drone autonomy, Kevin)
-    │   ├── mission10_agent/
-    │   │   ├── explorer_node.py     （ASSUMED)
-    │   │   ├── frontier.py          （ASSUMED)
-    │   │   ├── planner_astar.py     （ASSUMED)
-    │   │   └── tracker.py           （ASSUMED)
-    │   ├── launch/
-    │   │   └── explorer.launch.py
-    │   ├── setup.py
-    │   └── package.xml
-    │
-    ├── mission10_coordinator/                  (team-level)
-    │   ├── mission10_coordinator/
-    │   │   ├── team_coordinator_node.py       
-    │   │   ├── strip_partition.py
-    │   │   ├── safety_shield.py
-    │   │   ├── fault_manager.py
-    │   │   ├── belief_fusion_node.py      
-    │   │   └── team_planner_node.py        
-    │   ├── launch/
-    │   │   └── mission10_sim.launch.py
-    │   ├── setup.py
-    │   └── package.xml
-    │
-    └── mission10_sim/                          (gazebo integration)
-        ├── worlds/
-        │   └── mission10.world  (or .sdf)
-        ├── models/
-        │   ├── mines/
-        │   ├── trees/
-        │   └── obstacles/
-        ├── config/    
-        └── launch/
-            └── sim.launch.py                   (spawn 4 drones)
+                         ┌───────────────────────────────┐
+                         │           Gazebo              │
+                         │   (world + physics + sensors) │
+                         └──────────────┬────────────────┘
+                                        │
+                                pose / sensor topics
+                                        │
+────────────────────────────────────────────────────────────────────────────────────
+                    ROS2 / FastDDS P2P Network (Shared Topics)
+────────────────────────────────────────────────────────────────────────────────────
+
+     /team/pose_beacon
+     /team/sync_hello
+     /team/sync_ack
+     /team/mine_delta
+     /team/tile_delta (optional)
+     /team/task_announce
+     /team/task_claim
+     /team/task_result
+
+
+ ┌───────────────────┐    ┌───────────────────┐
+ │      DRONE 1      │    │      DRONE 2      │
+ │                   │    │                   │
+ │  explorer_node    │    │  explorer_node    │
+ │  (frontier/A*)    │    │  (frontier/A*)    │
+ │        │          │    │        │          │
+ │        ▼          │    │        ▼          │
+ │  p2p_task_node    │◀──▶│  p2p_task_node    │
+ │ (task auction)    │    │ (task auction)    │
+ │        │          │    │        │          │
+ │        ▼          │    │        ▼          │
+ │   p2p_sync_node   │◀──▶│   p2p_sync_node   │
+ │ (sync window +    │    │ (sync window +    │
+ │  map fusion)      │    │  map fusion)      │
+ └───────────────────┘    └───────────────────┘
+          │                         │
+          │                         │
+ ┌───────────────────┐    ┌───────────────────┐
+ │      DRONE 3      │    │      DRONE 4      │
+ │                   │    │                   │
+ │  explorer_node    │    │  explorer_node    │
+ │        │          │    │        │          │
+ │        ▼          │    │        ▼          │
+ │  p2p_task_node    │◀──▶│  p2p_task_node    │
+ │        │          │    │        │          │
+ │        ▼          │    │        ▼          │
+ │   p2p_sync_node   │◀──▶│   p2p_sync_node   │
+ │                   │    │                   │
+ └───────────────────┘    └───────────────────┘
+
+
+Legend
+------
+explorer_node     : per-drone exploration (frontier + planning)
+p2p_sync_node     : map sharing (neighbor sync + diffusion)
+p2p_task_node     : decentralized task auction
 ```
 
 ## Challenge
