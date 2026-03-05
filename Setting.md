@@ -63,7 +63,7 @@ The **winner sends `task_cmd` to the local explorer** (interrupting exploration)
 
 ### 4. `mission_logic_node`
 
-(merge it into `p2p_task_node`)
+(merge it into `p2p_task_node` or independent)
 
 Responsibilities:
 
@@ -77,22 +77,6 @@ Responsibilities:
   * state transitions
 * Sends `task_cmd` to the local explorer
 * (optional) broadcasts `mode_beacon` for team observation/consistency
-
----
-
-💡 **MVP suggestion**
-
-You can merge **(3) + (4)** into a single node:
-
-```
-p2p_mission_node
-```
-
-This node simultaneously handles:
-
-* state machine
-* BT ticking
-* task auction
 
 ---
 
