@@ -27,7 +27,7 @@ The coordination strategy is based on a fully decentralized multi-agent architec
 - Task allocation is implemented using a distributed auction mechanism, where agents independently compute task costs and compete through a claim process.
 - Local decision making is implemented using a state machine / behavior-based control architecture, allowing reactive and robust operation without centralized planning.
 
-## Grid
+## Flow
 MVP
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
