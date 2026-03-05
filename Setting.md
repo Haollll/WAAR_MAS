@@ -1,6 +1,5 @@
-# A) ROS2 Nodes Used (Each Drone Runs Them — Fully P2P)
+# A) For Each drone (×4) 
 
-**Each drone (×4)**
 
 ### 1. `explorer_node` (Kevin - Skipp what he did here)
 ---
@@ -64,7 +63,7 @@ The **winner sends `task_cmd` to the local explorer** (interrupting exploration)
 
 ### 4. `mission_logic_node`
 
-(You — or merge it into `p2p_task_node`)
+(merge it into `p2p_task_node`)
 
 Responsibilities:
 
