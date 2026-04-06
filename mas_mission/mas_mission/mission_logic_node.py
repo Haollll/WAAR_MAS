@@ -39,6 +39,15 @@ from std_msgs.msg import String
 from nav_msgs.msg import OccupancyGrid
 
 from .state_machine import StateMachine, MissionContext
+from .bt_runner import (
+    PrioritySelector,
+    CollisionGuardNode,
+    GeofenceGuardNode,
+    FailureMonitorNode,
+    TaskExecutorNode,
+    ExplorationPolicyNode,
+    P2PSyncManagerNode,
+)
 
 
 # ── Grid sector assignment ────────────────────────────────────────────────────
@@ -95,6 +104,10 @@ class MissionLogicNode(Node):
         arena_w              = self.get_parameter("arena_width").value
         arena_h              = self.get_parameter("arena_height").value
 
+        # Arena bounds (needed by GeofenceGuardNode)
+        self.arena_w = arena_w
+        self.arena_h = arena_h
+
         # ── Mission state ─────────────────────────────────────────────────────
         self.sm = StateMachine(self.drone_id, mission_duration)
         self.sm.on_transition(self._on_state_transition)
@@ -107,9 +120,18 @@ class MissionLogicNode(Node):
             drone_index, self.num_drones,
             grid_cols, grid_rows, arena_w, arena_h)
 
+        # Own pose (updated from PoseBeacon; needed by collision/geofence guards)
+        self.own_x: float = 0.0
+        self.own_y: float = 0.0
+        self.own_pose_last_seen: float = time.monotonic()  # FailureMonitor baseline
+
         # Team awareness
         self.team_states: Dict[str, str] = {}        # drone_id → state
         self.team_last_seen: Dict[str, float] = {}   # drone_id → monotonic
+        self.team_poses: Dict[str, tuple] = {}       # drone_id → (x, y)
+
+        # Pending task command from p2p_task_node (consumed by TaskExecutorNode)
+        self.pending_task_cmd: Optional[str] = None
 
         # Mine beliefs (mirrored from sync node via /team/mine_delta)
         self.mine_beliefs: Dict[str, dict] = {}      # mine_id → dict
@@ -118,6 +140,16 @@ class MissionLogicNode(Node):
         # PATH_VERIFY task tracking
         self._path_task_announced = False
         self._path_task_id: Optional[str] = None
+        self._path_verifier_role: Optional[str] = None   # "verifier" | "explorer"
+
+        # CONVERGE task tracking
+        self._converge_verifier_announced = False
+        self._converge_verifier_role: Optional[str] = None  # "verifier" | "explorer"
+        self._converge_rescans_announced = False
+
+        # Registry of task_id → task_type for tasks this node announces
+        # (TaskResult has no task_type field, so we look it up here)
+        self._task_registry: Dict[str, str] = {}
 
         # Occupancy grid (built during CONVERGE)
         self._grid_published = False
@@ -148,6 +180,21 @@ class MissionLogicNode(Node):
             TaskResult, "/team/task_result",
             self._on_task_result, 10)
 
+        # Task commands won by the p2p task node (buffered for TaskExecutorNode)
+        self.create_subscription(
+            String, f"/{self.drone_id}/task_cmd",
+            self._on_task_cmd, 10)
+
+        # ── Behaviour Tree ────────────────────────────────────────────────────
+        self.bt_tree = PrioritySelector([
+            CollisionGuardNode(),
+            GeofenceGuardNode(),
+            FailureMonitorNode(),
+            TaskExecutorNode(),
+            ExplorationPolicyNode(),
+            P2PSyncManagerNode(),
+        ])
+
         # ── Timers ────────────────────────────────────────────────────────────
         self.create_timer(1.0, self._tick)
 
@@ -159,9 +206,15 @@ class MissionLogicNode(Node):
 
     def _on_pose_beacon(self, msg: PoseBeacon):
         if msg.drone_id == self.drone_id:
+            # Track own pose for collision/geofence/failure guards
+            self.own_x = msg.x
+            self.own_y = msg.y
+            self.own_pose_last_seen = time.monotonic()
             return
+        now = time.monotonic()
         self.team_states[msg.drone_id] = msg.state
-        self.team_last_seen[msg.drone_id] = time.monotonic()
+        self.team_last_seen[msg.drone_id] = now
+        self.team_poses[msg.drone_id] = (msg.x, msg.y)
 
     # ── Belief mirroring ──────────────────────────────────────────────────────
 
@@ -178,10 +231,50 @@ class MissionLogicNode(Node):
                 }
 
     def _on_task_result(self, msg: TaskResult):
+        # ── Path verification complete ─────────────────────────────────────────
         if msg.task_id == self._path_task_id and msg.outcome == "confirmed":
             self.path_verified = True
             self.get_logger().info(
                 f"[{self.drone_id}] Path verification confirmed!")
+
+        # ── Role assignment from tasks we announced ────────────────────────────
+        task_type = self._task_registry.get(msg.task_id)
+
+        if task_type == "BECOME_PATH_VERIFIER":
+            if msg.executor_id == self.drone_id:
+                self._path_verifier_role = "verifier"
+                self.get_logger().info(
+                    f"[{self.drone_id}] Won BECOME_PATH_VERIFIER → role=verifier")
+            else:
+                self._path_verifier_role = "explorer"
+                self.get_logger().info(
+                    f"[{self.drone_id}] Lost BECOME_PATH_VERIFIER to "
+                    f"{msg.executor_id} → role=explorer")
+
+        elif task_type == "BECOME_VERIFIER":
+            if msg.executor_id == self.drone_id:
+                self._converge_verifier_role = "verifier"
+                self.get_logger().info(
+                    f"[{self.drone_id}] Won BECOME_VERIFIER → role=verifier")
+            else:
+                self._converge_verifier_role = "explorer"
+                self.get_logger().info(
+                    f"[{self.drone_id}] Lost BECOME_VERIFIER to "
+                    f"{msg.executor_id} → role=explorer")
+
+        # ── Mine belief update from any VERIFY_TAG result ─────────────────────
+        if (task_type == "VERIFY_TAG"
+                and msg.outcome in ("confirmed", "rejected")
+                and msg.mine_id in self.mine_beliefs):
+            self.mine_beliefs[msg.mine_id]["status"]     = msg.outcome
+            self.mine_beliefs[msg.mine_id]["confidence"] = msg.confidence
+            self.get_logger().info(
+                f"[{self.drone_id}] Mine {msg.mine_id} updated: "
+                f"status={msg.outcome} confidence={msg.confidence:.2f}")
+
+    def _on_task_cmd(self, msg: String):
+        """Buffer the latest task_cmd from p2p_task_node for TaskExecutorNode."""
+        self.pending_task_cmd = msg.data
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -228,25 +321,9 @@ class MissionLogicNode(Node):
 
         self.sm.tick(ctx)
 
-        # Per-state directives
-        state = self.sm.state
-
-        if state == "SURVEY":
-            if self.mission_start is None:
-                self.mission_start = time.monotonic()
-            self._cmd_survey()
-
-        elif state == "VERIFY_TAG":
-            self._cmd_verify_tag()
-
-        elif state == "PATH_VERIFY":
-            self._cmd_path_verify()
-
-        elif state == "CONVERGE":
-            self._cmd_converge()
-
-        elif state == "FINISH":
-            self._cmd_finish()
+        # Run the BT priority selector.  Guards fire first; exploration
+        # policy runs only when no guard has claimed the tick.
+        self.bt_tree.tick(self)
 
     # ── State directives ──────────────────────────────────────────────────────
 
@@ -271,34 +348,79 @@ class MissionLogicNode(Node):
         self._publish_cmd(cmd)
 
     def _cmd_path_verify(self):
-        """Announce a PATH_VERIFY task once, then wait."""
+        """
+        Auction the path-verifier role once, then issue a role-specific command.
+
+        BECOME_PATH_VERIFIER winner → VERIFY_PATH with sector corner waypoints.
+        Loser                       → FILL_GAPS covering the assigned sector.
+        Role not yet assigned       → AWAIT_PATH_VERIFY (waiting for auction).
+        """
         if not self._path_task_announced:
             self._path_task_announced = True
-            self._path_task_id = f"path_verify_{self.drone_id}_0"
+            self._path_task_id = f"become_pv_{self.drone_id}_0"
+            self._announce_task(
+                self._path_task_id, "BECOME_PATH_VERIFIER",
+                self.sector["cx"], self.sector["cy"],
+                priority=1.0, claim_window_s=3.0,
+            )
 
-            msg = TaskAnnounce()
-            msg.task_id        = self._path_task_id
-            msg.task_type      = "PATH_VERIFY"
-            msg.announcer_id   = self.drone_id
-            msg.target_x       = self.sector["cx"]
-            msg.target_y       = self.sector["cy"]
-            msg.priority       = 1.0
-            msg.claim_window_s = 3.0
-            msg.stamp          = self.get_clock().now().to_msg()
-            self.pub_announce.publish(msg)
-            self.get_logger().info(
-                f"[{self.drone_id}] Announced PATH_VERIFY task")
+        if self._path_verifier_role == "verifier":
+            corners = [
+                [self.sector["x_min"], self.sector["y_min"]],
+                [self.sector["x_max"], self.sector["y_min"]],
+                [self.sector["x_max"], self.sector["y_max"]],
+                [self.sector["x_min"], self.sector["y_max"]],
+            ]
+            cmd = json.dumps({"cmd": "VERIFY_PATH", "waypoints": corners})
 
-        cmd = json.dumps({"cmd": "AWAIT_PATH_VERIFY"})
+        elif self._path_verifier_role == "explorer":
+            cmd = json.dumps({
+                "cmd":   "FILL_GAPS",
+                "x_min": self.sector["x_min"],
+                "x_max": self.sector["x_max"],
+                "y_min": self.sector["y_min"],
+                "y_max": self.sector["y_max"],
+            })
+
+        else:
+            cmd = json.dumps({"cmd": "AWAIT_PATH_VERIFY"})
+
         self._publish_cmd(cmd)
 
     def _cmd_converge(self):
         """
-        Publish the occupancy grid once, then tell explorer to hold position.
+        Converge phase:
+          1. Publish the final occupancy grid once.
+          2. Auction the BECOME_VERIFIER role once.
+          3. Winner: announce VERIFY_TAG rescan tasks for low-confidence candidates.
+          4. All drones: hold position while rescans complete.
         """
         if not self._grid_published:
             self._publish_occupancy_grid()
             self._grid_published = True
+
+        if not self._converge_verifier_announced:
+            self._converge_verifier_announced = True
+            task_id = f"become_verifier_{self.drone_id}_0"
+            self._announce_task(
+                task_id, "BECOME_VERIFIER",
+                self.sector["cx"], self.sector["cy"],
+                priority=1.0, claim_window_s=3.0,
+            )
+
+        if self._converge_verifier_role == "verifier" and not self._converge_rescans_announced:
+            self._converge_rescans_announced = True
+            count = 0
+            for mine_id, belief in self.mine_beliefs.items():
+                if belief["status"] == "candidate" and belief["confidence"] < 0.7:
+                    self._announce_task(
+                        f"rescan_{mine_id}_{self.drone_id}", "VERIFY_TAG",
+                        belief["x"], belief["y"],
+                        priority=0.9, claim_window_s=2.0,
+                    )
+                    count += 1
+            self.get_logger().info(
+                f"[{self.drone_id}] Announced {count} rescan task(s) in CONVERGE")
 
         cmd = json.dumps({"cmd": "HOLD_POSITION"})
         self._publish_cmd(cmd)
@@ -349,6 +471,24 @@ class MissionLogicNode(Node):
 
     # ── Utils ─────────────────────────────────────────────────────────────────
 
+    def _announce_task(self, task_id: str, task_type: str,
+                       target_x: float, target_y: float,
+                       priority: float, claim_window_s: float) -> None:
+        """Publish a TaskAnnounce and register task_id → task_type locally."""
+        msg = TaskAnnounce()
+        msg.task_id        = task_id
+        msg.task_type      = task_type
+        msg.announcer_id   = self.drone_id
+        msg.target_x       = target_x
+        msg.target_y       = target_y
+        msg.priority       = priority
+        msg.claim_window_s = claim_window_s
+        msg.stamp          = self.get_clock().now().to_msg()
+        self.pub_announce.publish(msg)
+        self._task_registry[task_id] = task_type
+        self.get_logger().info(
+            f"[{self.drone_id}] Announced {task_type} task {task_id}")
+
     def _publish_cmd(self, cmd_json: str):
         msg = String()
         msg.data = cmd_json
@@ -358,6 +498,18 @@ class MissionLogicNode(Node):
         self.get_logger().info(
             f"[{self.drone_id}] State: {from_state} → {to_state} "
             f"(t_remaining={self._time_remaining():.0f}s)")
+
+        if to_state == "SURVEY":
+            # Reset PATH_VERIFY state so re-entry works correctly
+            self._path_task_announced = False
+            self._path_task_id        = None
+            self._path_verifier_role  = None
+
+        elif to_state == "PATH_VERIFY":
+            # Reset CONVERGE state ahead of possible entry
+            self._converge_verifier_announced = False
+            self._converge_verifier_role      = None
+            self._converge_rescans_announced  = False
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
