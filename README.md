@@ -234,9 +234,8 @@ diff -rq /Users/lihao/Downloads/mas_coordinator /Users/lihao/ros2_ws/src/mas_coo
 cp /Users/lihao/Downloads/mas_coordinator/<file> /Users/lihao/ros2_ws/src/mas_coordinator/<file>
 ```
 
-## Explorer Integration (Kevin)
+## Explorer Integration 
 
-- **Kevin's repo:** `waar_autonomy` (private)
 - **Adapter file:** `waar_autonomy/src/adapters/ros2_adapter.py`
 
 ### Topics
@@ -250,17 +249,13 @@ cp /Users/lihao/Downloads/mas_coordinator/<file> /Users/lihao/ros2_ws/src/mas_co
 
 ### Coordinate Conversion
 
-Kevin uses `(row, col)` integers; MAS uses `(x, y)` floats.
+uses `(row, col)` integers; MAS uses `(x, y)` floats.
 
 ```
 x = col * CELL_SIZE
 y = row * CELL_SIZE
 CELL_SIZE = 1.0 m  (default)
 ```
-
-### Integration Status
-
-Kevin needs to fill in the `_step()` placeholder in `ros2_adapter.py`.
 
 ## Challenge
 We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
