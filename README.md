@@ -30,6 +30,7 @@ The coordination strategy is based on a fully decentralized multi-agent architec
 ## Flow
 MVP
 ```
+<<<<<<< HEAD
 +-------------------------------------------------------------------------------+
 |                               Mission Layer (Per-Drone)                       |
 |   Goal: maximize coverage + produce reliable mine beliefs + endgame verify    |
@@ -91,6 +92,69 @@ MVP
 |                           Gazebo + ROS2 Bridges                              |
 |                  (world models, mines, obstacles, sensors)                   |
 +------------------------------------------------------------------------------+
+=======
+┌────────────────────────────���─────────────────────────────��────────────────────┐
+│                               Mission Layer (Per-Drone)                       │
+│   Goal: maximize coverage + produce reliable mine beliefs + endgame verify    │
+│                                                                               │
+│   State Machine: BOOT → SURVEY → VERIFY_TAG → PATH_VERIFY → CONVERGE → FINISH │
+│                                                                               │
+│   Behavior Tree (priority):                                                   │
+│     1) Safety / Collision Guard                                               │
+│     2) Geofence + Time Guard                                                  │
+│     3) Failure Monitor                                                        │
+│     4) Task Executor (VERIFY / RESCAN)                                        │
+│     5) Exploration Policy (frontier)                                          │
+│     6) P2P Sync Manager (neighbor sessions)                                   │
+└─────────────────────────────���─────────────────────────────────────────────────┘
+                 ▲                     ▲                     ▲
+                 │ task_cmd            │ local belief         │ status
+                 │ (interrupt)         │ (fused)              │ (health)
+                 │                     │                     │
+┌────────────────┴─────────────────────┴─────────────────────┴──────────────────┐
+│                         Coordination Layer (Fully P2P)                        │
+│     (No central controller; every drone runs identical coordination logic)    │
+│                                                                               │
+│  A) Neighbor Graph (from pose beacons)                                        │
+│     - edge(i,j) if dist(i,j) < R_enter; remove if dist(i,j) > R_exit          │
+│                                                                               │
+│  B) Sync Window Protocol (Scheme B)                                           │
+│     - hello/ack handshake → SYNC_ACTIVE(T_sync)                               │
+│     - exchange missing deltas (mine/tile) with seq + TTL + dedup cache        │
+│                                                                               │
+│  C) Decentralized Task Auction                                                │
+│     - announce(task) → claims(cost) → winner executes → result broadcast      │
+│     - tasks: VERIFY_TAG, RESCAN, BECOME_VERIFIER (endgame)                    │
+│                                                                               │
+│  Shared ROS2 Topics (FastDDS):                                                │
+│    /team/pose_beacon   /team/sync_hello  /team/sync_ack                       │
+│    /team/mine_delta    /team/tile_delta (opt)                                 │
+│    /team/task_announce /team/task_claim  /team/task_result                    │
+└──────────────────────────────────────────────────────���────────────────────────┘
+                 ▲                     ▲                     ▲
+                 │ pose/sensors         │ detections           │ map updates
+                 │                      │                      │
+┌────────────────┴─────────────────────┴─────────────────────┴─────────────────┐
+│                         Per-Drone Autonomy Layer (x4)                        │
+│                                                                              │
+│  explorer_node (Kevin)                                                       │
+│   - SLAM/VIO (or sim pose)                                                   │
+│   - occupancy grid update                                                    │
+│   - frontier selection (local belief-driven)                                 │
+│   - A* to chosen frontier                                                    ���
+│   - tracking                                                                 │
+│                                                                              │
+│  Optional local mapping/detector                                             │
+│   - mine candidate detection → triggers task announce                        │
+└──────────────────────────���────────────────────────────���──────────────────────┘
+                 ▲
+                 │
+┌────────────────┴───────────────────────────────────────────────────��─────────┐
+│                               Simulation Layer                               │
+│                           Gazebo + ROS2 Bridges                              │
+│                  (world models, mines, obstacles, sensors)                   │
+└──────────────────────────────────────────────────────────────────────────���───┘
+>>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 ```
 
 ## ROS2 Architecture
@@ -101,10 +165,17 @@ MVP
                          +--------------+----------------+
                                         |
                                 pose / sensor topics
+<<<<<<< HEAD
                                         |
 --------------------------------------------------------------------------------
                     ROS2 / FastDDS P2P Network (Shared Topics)
 --------------------------------------------------------------------------------
+=======
+                                        │
+──────────────────────────────────────────────────��─────────────────────────────────
+                    ROS2 / FastDDS P2P Network (Shared Topics)
+──────────────────────────────────────────────���─────────────────────────────────────
+>>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 
      /team/pose_beacon
      /team/sync_hello
@@ -183,7 +254,11 @@ p2p_task_node     : decentralized task auction
 | `mas_interfaces` | ament_cmake | Custom ROS2 message definitions for all team communication |
 | `mas_task` | ament_python | P2P task auction node — distributed task allocation via announce/claim/result |
 | `mas_sync` | ament_python | P2P sync node — Scheme B sync window + mine belief fusion |
+<<<<<<< HEAD
 | `mas_mission` | ament_python | Mission logic + state machine + BT priority selector (`bt_runner.py`) — BOOT -> SURVEY -> VERIFY_TAG -> PATH_VERIFY -> CONVERGE -> FINISH |
+=======
+| `mas_mission` | ament_python | Mission logic + state machine + BT priority selector (`bt_runner.py`) — BOOT → SURVEY → VERIFY_TAG → PATH_VERIFY → CONVERGE → FINISH |
+>>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 
 ## Dev Setup & Commands
 
@@ -234,8 +309,14 @@ diff -rq /Users/lihao/Downloads/mas_coordinator /Users/lihao/ros2_ws/src/mas_coo
 cp /Users/lihao/Downloads/mas_coordinator/<file> /Users/lihao/ros2_ws/src/mas_coordinator/<file>
 ```
 
+<<<<<<< HEAD
 ## Explorer Integration 
 
+=======
+## Explorer Integration (Kevin)
+
+- **Kevin's repo:** `waar_autonomy` (private)
+>>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 - **Adapter file:** `waar_autonomy/src/adapters/ros2_adapter.py`
 
 ### Topics
@@ -249,7 +330,11 @@ cp /Users/lihao/Downloads/mas_coordinator/<file> /Users/lihao/ros2_ws/src/mas_co
 
 ### Coordinate Conversion
 
+<<<<<<< HEAD
 uses `(row, col)` integers; MAS uses `(x, y)` floats.
+=======
+Kevin uses `(row, col)` integers; MAS uses `(x, y)` floats.
+>>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 
 ```
 x = col * CELL_SIZE
@@ -257,6 +342,13 @@ y = row * CELL_SIZE
 CELL_SIZE = 1.0 m  (default)
 ```
 
+<<<<<<< HEAD
+=======
+### Integration Status
+
+Kevin needs to fill in the `_step()` placeholder in `ros2_adapter.py`.
+
+>>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 ## Challenge
 We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
 On the other hand, adopting a learning-based method is not very feasible for a minimum viable product (MVP), and it would significantly increase the complexity, also only four drones is not ideal to use GNN.
