@@ -308,47 +308,6 @@ python3 -m pytest tests/ -v
 diff -rq /Users/lihao/Downloads/mas_coordinator /Users/lihao/ros2_ws/src/mas_coordinator --exclude="__pycache__" --exclude="*.pyc"
 cp /Users/lihao/Downloads/mas_coordinator/<file> /Users/lihao/ros2_ws/src/mas_coordinator/<file>
 ```
-
-<<<<<<< HEAD
-## Explorer Integration 
-
-=======
-## Explorer Integration (Kevin)
-
-- **Kevin's repo:** `waar_autonomy` (private)
->>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
-- **Adapter file:** `waar_autonomy/src/adapters/ros2_adapter.py`
-
-### Topics
-
-| Direction | Topic | Message Type |
-|---|---|---|
-| Subscribes | `/{drone_id}/task_cmd` | `std_msgs/String` (JSON) |
-| Subscribes | `/{drone_id}/mission_cmd` | `std_msgs/String` (JSON) |
-| Publishes | `/{drone_id}/pose` | `geometry_msgs/PoseStamped` |
-| Publishes | `/{drone_id}/mine_candidates` | `mas_interfaces/MineBelief` |
-
-### Coordinate Conversion
-
-<<<<<<< HEAD
-uses `(row, col)` integers; MAS uses `(x, y)` floats.
-=======
-Kevin uses `(row, col)` integers; MAS uses `(x, y)` floats.
->>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
-
-```
-x = col * CELL_SIZE
-y = row * CELL_SIZE
-CELL_SIZE = 1.0 m  (default)
-```
-
-<<<<<<< HEAD
-=======
-### Integration Status
-
-Kevin needs to fill in the `_step()` placeholder in `ros2_adapter.py`.
-
->>>>>>> 7e7a86e (fix: rule compliance + edge cases + bug fixes)
 ## Challenge
 We decided to use a rule-based approach (eg. predifined rules, cost functions) for the multi-agent system, but there are very few relevant papers to reference, and most of them are outdated.
 On the other hand, adopting a learning-based method is not very feasible for a minimum viable product (MVP), and it would significantly increase the complexity, also only four drones is not ideal to use GNN.
