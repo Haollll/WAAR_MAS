@@ -20,7 +20,7 @@ import rclpy
 from rclpy.node import Node
 import math
 import time
-from typing import Dict, Set, Optional
+from typing import Dict, List, Set, Optional, Tuple
 
 from mas_interfaces.msg import (
     TaskAnnounce, TaskClaim, TaskResult, MineBelief
@@ -54,6 +54,12 @@ class P2PTaskNode(Node):
 
         # Tracks task_ids we have already announced (to avoid spam)
         self._announced: Dict[str, float] = {}  # task_id -> monotonic time
+
+        # Mine IDs that are already confirmed/rejected — skip re-announcing
+        self._resolved_mines: Set[str] = set()
+
+        # Tasks awaiting retry (no bidders): (retry_at, TaskAnnounceData)
+        self._pending_retry: List[Tuple[float, "TaskAnnounceData"]] = []
 
         self.auction_mgr = AuctionManager(self.drone_id)
         self._seq = 0   # for generating unique task_ids
@@ -106,8 +112,11 @@ class P2PTaskNode(Node):
     def _on_mine_candidate(self, msg: MineBelief):
         """
         When explorer detects a new mine candidate, announce a VERIFY_TAG task.
-        Cooldown prevents spamming the same candidate.
+        Cooldown prevents spamming; resolved mines are never re-announced.
         """
+        if msg.mine_id in self._resolved_mines:
+            return   # already confirmed or rejected — skip
+
         task_id = f"verify_{msg.mine_id}"
         now = time.monotonic()
 
@@ -122,7 +131,7 @@ class P2PTaskNode(Node):
             target_x=msg.x,
             target_y=msg.y,
             priority=msg.confidence,
-            claim_window_s=2.0,
+            claim_window_s=3.0,
         )
 
     # ── Announce ──────────────────────────────────────────────────────────────
@@ -200,9 +209,37 @@ class P2PTaskNode(Node):
     def _tick(self):
         resolved = self.auction_mgr.tick()
         won_tasks = self.auction_mgr.pop_won_tasks()
+        abandoned = self.auction_mgr.pop_abandoned_tasks()
 
         for task in won_tasks:
             self._execute_won_task(task)
+
+        # Schedule abandoned tasks for retry in 5 s
+        now = time.monotonic()
+        for task in abandoned:
+            retry_at = now + 5.0
+            self._pending_retry.append((retry_at, task))
+            self.get_logger().warn(
+                f"[{self.drone_id}] Task {task.task_id} had no bidders — "
+                f"retrying in 5s")
+
+        # Fire any retries that are due
+        still_pending = []
+        for retry_at, task in self._pending_retry:
+            if now >= retry_at:
+                self.get_logger().info(
+                    f"[{self.drone_id}] Retrying task {task.task_id}")
+                self.announce_task(
+                    task_id=task.task_id,
+                    task_type=task.task_type,
+                    target_x=task.target_x,
+                    target_y=task.target_y,
+                    priority=task.priority,
+                    claim_window_s=task.claim_window_s,
+                )
+            else:
+                still_pending.append((retry_at, task))
+        self._pending_retry = still_pending
 
     def _execute_won_task(self, task: TaskAnnounceData):
         """
@@ -236,6 +273,9 @@ class P2PTaskNode(Node):
         When a result arrives (could be ours or another drone's),
         mark ourselves as no longer busy if it was our task.
         """
+        if msg.outcome in ("confirmed", "rejected") and msg.mine_id:
+            self._resolved_mines.add(msg.mine_id)
+
         if msg.executor_id == self.drone_id and msg.task_id == self.current_task_id:
             self.busy = False
             self.current_task_id = None

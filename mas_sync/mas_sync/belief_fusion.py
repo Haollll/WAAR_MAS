@@ -55,18 +55,26 @@ class BeliefStore:
 
         # Rule 1: higher seq wins
         if incoming.seq > existing.seq:
-            # Rule 3: don't downgrade sticky statuses unless seq is strictly higher
-            if (existing.status in self.STICKY_STATUSES and
+            # Rule 3: confirmed is never downgraded to rejected (safety-first).
+            # Also preserve sticky status when incoming is a non-sticky downgrade.
+            if existing.status == "confirmed" and incoming.status == "rejected":
+                incoming.status = "confirmed"
+            elif (existing.status in self.STICKY_STATUSES and
                     incoming.status not in self.STICKY_STATUSES):
-                # preserve the sticky status but update the rest
                 incoming.status = existing.status
             self._store[incoming.mine_id] = incoming
             return True
 
-        # Rule 2: equal seq, higher confidence wins
-        if incoming.seq == existing.seq and incoming.confidence > existing.confidence:
-            self._store[incoming.mine_id] = incoming
-            return True
+        # Rule 2: equal seq — confirmed > rejected > candidate; then higher confidence
+        if incoming.seq == existing.seq:
+            # confirmed beats rejected (safety-first: never discard a live mine)
+            if (incoming.status == "confirmed"
+                    and existing.status == "rejected"):
+                self._store[incoming.mine_id] = incoming
+                return True
+            if incoming.confidence > existing.confidence:
+                self._store[incoming.mine_id] = incoming
+                return True
 
         return False
 

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import json
 import math
-import time
+import time  # used by FailureMonitorNode
 from enum import Enum, auto
 from typing import Any, List
 
@@ -76,7 +76,7 @@ class PrioritySelector(BTNode):
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-R_COLLISION  = 2.0   # metres – minimum safe separation between drones
+R_COLLISION  = 0.8   # metres – minimum safe separation between drones
 POSE_STALE_S = 3.0   # seconds – own-pose age before declaring failure
 
 
@@ -187,8 +187,6 @@ class ExplorationPolicyNode(BTNode):
         state = node.sm.state
 
         if state == "SURVEY":
-            if node.mission_start is None:
-                node.mission_start = time.monotonic()
             node._cmd_survey()
 
         elif state == "VERIFY_TAG":

@@ -12,11 +12,11 @@ Usage:
   ros2 launch mas_mission team_launch.py
 
 Optional overrides:
-  ros2 launch mas_mission team_launch.py mission_duration:=480.0 arena_width:=25.0
+  ros2 launch mas_mission team_launch.py mission_duration:=480.0 arena_width:=91.44
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -24,10 +24,10 @@ from launch_ros.actions import Node
 DRONE_IDS = ["d1", "d2", "d3", "d4"]
 
 
-def drone_group(drone_id: str, drone_index: int,
+def drone_group(drone_id: str,
                 mission_duration, num_drones,
                 arena_width, arena_height) -> list:
-    """Return the three nodes for one drone."""
+    """Return the three nodes for one drone (sync + task + mission)."""
 
     common_params = [
         {"drone_id":         drone_id},
@@ -51,7 +51,6 @@ def drone_group(drone_id: str, drone_index: int,
         ],
         output="screen",
         remappings=[
-            # Remap shared team topics to /team/* (no namespace prefix)
             (f"/{drone_id}/team/pose_beacon", "/team/pose_beacon"),
             (f"/{drone_id}/team/sync_hello",  "/team/sync_hello"),
             (f"/{drone_id}/team/sync_ack",    "/team/sync_ack"),
@@ -81,11 +80,7 @@ def drone_group(drone_id: str, drone_index: int,
         executable="mission_logic_node",
         name=f"mission_logic_{drone_id}",
         namespace=drone_id,
-        parameters=common_params + [
-            {"drone_index":  drone_index},
-            {"grid_cols":    2},
-            {"grid_rows":    2},
-        ],
+        parameters=common_params,
         output="screen",
         remappings=[
             (f"/{drone_id}/team/pose_beacon",   "/team/pose_beacon"),
@@ -102,14 +97,14 @@ def generate_launch_description():
 
     # ── Declare overridable arguments ─────────────────────────────────────────
     args = [
-        DeclareLaunchArgument("mission_duration", default_value="600.0",
-                              description="Total mission time in seconds"),
+        DeclareLaunchArgument("mission_duration", default_value="420.0",
+                              description="Total mission time in seconds (IARC: 420 s)"),
         DeclareLaunchArgument("num_drones",       default_value="4",
                               description="Number of drones in the team"),
-        DeclareLaunchArgument("arena_width",      default_value="30.0",
-                              description="Arena width in metres"),
-        DeclareLaunchArgument("arena_height",     default_value="30.0",
-                              description="Arena height in metres"),
+        DeclareLaunchArgument("arena_width",      default_value="91.44",
+                              description="Arena width in metres (IARC: 300 ft = 91.44 m)"),
+        DeclareLaunchArgument("arena_height",     default_value="24.38",
+                              description="Arena height in metres (IARC: 80 ft = 24.38 m)"),
     ]
 
     mission_duration = LaunchConfiguration("mission_duration")
@@ -119,9 +114,9 @@ def generate_launch_description():
 
     # ── Build nodes for each drone ────────────────────────────────────────────
     all_nodes = []
-    for i, drone_id in enumerate(DRONE_IDS):
+    for drone_id in DRONE_IDS:
         all_nodes.extend(
-            drone_group(drone_id, i,
+            drone_group(drone_id,
                         mission_duration, num_drones,
                         arena_width, arena_height)
         )

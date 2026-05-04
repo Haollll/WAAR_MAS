@@ -16,6 +16,7 @@ setup(
     entry_points={
         "console_scripts": [
             f"mission_logic_node = {package_name}.mission_logic_node:main",
+            f"stub_explorer = {package_name}.stub_explorer:main",
         ],
     },
 )

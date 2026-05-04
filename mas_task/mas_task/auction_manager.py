@@ -86,7 +86,8 @@ class AuctionManager:
     def __init__(self, my_drone_id: str):
         self.my_id = my_drone_id
         self._auctions: Dict[str, AuctionEntry] = {}
-        self._won: List[TaskAnnounceData] = []   # tasks we won, waiting to be dispatched
+        self._won: List[TaskAnnounceData] = []       # tasks we won, waiting to be dispatched
+        self._abandoned: List[TaskAnnounceData] = [] # tasks with no bidders
 
     def on_announce(self, data: TaskAnnounceData):
         if data.task_id in self._auctions:
@@ -110,6 +111,8 @@ class AuctionManager:
                 resolved.append(task_id)
                 if winner == self.my_id:
                     self._won.append(entry.announce)
+                elif winner is None:
+                    self._abandoned.append(entry.announce)
                 # Keep entry so late claims are silently ignored
         return resolved
 
@@ -117,6 +120,15 @@ class AuctionManager:
         """Return and clear the list of tasks this drone won."""
         won, self._won = self._won, []
         return won
+
+    def pop_abandoned_tasks(self) -> List[TaskAnnounceData]:
+        """Return and clear the list of tasks with no bidders."""
+        abandoned, self._abandoned = self._abandoned, []
+        return abandoned
+
+    def has_auction(self, task_id: str) -> bool:
+        """Return True if task_id is already registered (open or closed)."""
+        return task_id in self._auctions
 
     def compute_cost(self, announce: TaskAnnounceData,
                      my_x: float, my_y: float,

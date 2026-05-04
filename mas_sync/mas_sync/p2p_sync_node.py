@@ -77,7 +77,7 @@ class P2PSyncNode(Node):
         self.my_y = 0.0
         self.my_z = 0.0
         self.my_heading = 0.0
-        self.my_state   = "BOOT"
+        self.my_state   = "SURVEY"  # default to SURVEY so beacons are valid
         self.my_battery = 100.0
         self._seq        = 0   # monotonic seq for dedup cache
 

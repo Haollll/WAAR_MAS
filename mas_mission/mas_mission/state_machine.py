@@ -25,6 +25,13 @@ from typing import Optional, Callable, List
 import time
 
 
+# ── Arena constants (IARC Mission 10 spec: 300 ft × 80 ft) ───────────────────
+
+ARENA_WIDTH    = 91.44   # metres (300 ft)
+ARENA_HEIGHT   = 24.38   # metres (80 ft)
+MISSION_DURATION = 420.0 # seconds (7 minutes)
+
+
 # ── State definitions ─────────────────────────────────────────────────────────
 
 STATES = [
@@ -37,15 +44,16 @@ STATES = [
 ]
 
 # Time thresholds (seconds remaining in mission) that trigger state transitions
-T_PATH_VERIFY = 120.0   # enter PATH_VERIFY when ≤ 120s left
-T_CONVERGE    = 60.0    # enter CONVERGE when ≤ 60s left
+# Adjusted for 7-minute (420 s) total mission time.
+T_PATH_VERIFY = 90.0    # enter PATH_VERIFY when ≤ 90s left
+T_CONVERGE    = 45.0    # enter CONVERGE when ≤ 45s left
 T_FINISH      = 10.0    # enter FINISH when ≤ 10s left
 
 
 @dataclass
 class MissionContext:
     """Snapshot of mission state passed to transition checks."""
-    time_remaining:    float = 600.0
+    time_remaining:    float = 420.0
     mine_count:        int   = 0       # candidates seen
     confirmed_count:   int   = 0       # confirmed mines
     all_drones_ready:  bool  = False
@@ -56,7 +64,7 @@ class MissionContext:
 
 class StateMachine:
 
-    def __init__(self, drone_id: str, mission_duration: float = 600.0):
+    def __init__(self, drone_id: str, mission_duration: float = 420.0):
         self.drone_id         = drone_id
         self.mission_duration = mission_duration
         self.state            = "BOOT"

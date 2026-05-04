@@ -116,7 +116,7 @@ class TestPrioritySelector:
 class TestCollisionGuardNode:
 
     def test_success_when_neighbor_within_r_collision(self):
-        # Neighbor 0.5 m away; R_COLLISION = 2.0 m
+        # Neighbor 0.5 m away; R_COLLISION = 0.8 m
         node = make_node(own_x=5.0, own_y=5.0, team_poses={"d2": (5.5, 5.0)})
         assert CollisionGuardNode().tick(node) == BTStatus.SUCCESS
         assert '"HOLD"' in published_cmd(node)
@@ -132,12 +132,13 @@ class TestCollisionGuardNode:
         assert CollisionGuardNode().tick(node) == BTStatus.FAILURE
 
     def test_exactly_at_r_collision_boundary_is_safe(self):
-        # dist == R_COLLISION is NOT < R_COLLISION → FAILURE
+        # dist == R_COLLISION (0.8 m) is NOT < R_COLLISION → FAILURE
         node = make_node(own_x=0.0, own_y=0.0,
                          team_poses={"d2": (R_COLLISION, 0.0)})
         assert CollisionGuardNode().tick(node) == BTStatus.FAILURE
 
     def test_just_inside_r_collision_boundary_triggers(self):
+        # dist = 0.79 m < R_COLLISION (0.8 m) → SUCCESS
         node = make_node(own_x=0.0, own_y=0.0,
                          team_poses={"d2": (R_COLLISION - 0.01, 0.0)})
         assert CollisionGuardNode().tick(node) == BTStatus.SUCCESS

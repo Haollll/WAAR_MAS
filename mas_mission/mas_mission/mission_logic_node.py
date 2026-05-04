@@ -9,20 +9,19 @@ Responsibilities:
   - Build MissionContext from team beliefs and drone states
   - Drive state machine tick
   - Issue high-level directives per state:
-      SURVEY       → tell explorer to sweep assigned grid sector
+      SURVEY       → tell explorer to sweep the full arena
       VERIFY_TAG   → announce VERIFY_TAG tasks for unconfirmed mines
-      PATH_VERIFY  → announce path verification task
-      CONVERGE     → broadcast final occupancy grid
+      PATH_VERIFY  → auction BECOME_PATH_VERIFIER role; verifier flies the
+                     corridor, explorer fills gaps
+      CONVERGE     → broadcast final occupancy grid, rescan low-confidence mines
       FINISH       → trigger land + submit
 
 Parameters:
   drone_id          : str
-  mission_duration  : float   total mission time in seconds (default 600)
+  mission_duration  : float   total mission time in seconds (default 420)
   num_drones        : int     expected team size (default 4)
-  grid_cols         : int     grid subdivision columns (default 2)
-  grid_rows         : int     grid subdivision rows    (default 2)
-  arena_width       : float   arena width in metres    (default 30.0)
-  arena_height      : float   arena height in metres   (default 30.0)
+  arena_width       : float   arena width in metres    (default 91.44 — 300 ft)
+  arena_height      : float   arena height in metres   (default 24.38 — 80 ft)
 """
 
 import rclpy
@@ -38,7 +37,7 @@ from mas_interfaces.msg import (
 from std_msgs.msg import String
 from nav_msgs.msg import OccupancyGrid
 
-from .state_machine import StateMachine, MissionContext
+from .state_machine import StateMachine, MissionContext, ARENA_WIDTH, ARENA_HEIGHT, MISSION_DURATION
 from .bt_runner import (
     PrioritySelector,
     CollisionGuardNode,
@@ -50,34 +49,6 @@ from .bt_runner import (
 )
 
 
-# ── Grid sector assignment ────────────────────────────────────────────────────
-
-def assign_sector(drone_index: int, num_drones: int,
-                  cols: int, rows: int,
-                  arena_w: float, arena_h: float) -> dict:
-    """
-    Divide arena into cols×rows grid; assign one cell to each drone.
-    Returns {"x_min","x_max","y_min","y_max","cx","cy"}.
-    Falls back to whole arena if more drones than cells.
-    """
-    cells = [(c, r) for r in range(rows) for c in range(cols)]
-    if drone_index >= len(cells):
-        drone_index = drone_index % len(cells)
-    col, row = cells[drone_index]
-    cell_w = arena_w / cols
-    cell_h = arena_h / rows
-    x_min = col * cell_w
-    x_max = x_min + cell_w
-    y_min = row * cell_h
-    y_max = y_min + cell_h
-    return {
-        "x_min": x_min, "x_max": x_max,
-        "y_min": y_min, "y_max": y_max,
-        "cx": (x_min + x_max) / 2,
-        "cy": (y_min + y_max) / 2,
-    }
-
-
 # ── Main node ─────────────────────────────────────────────────────────────────
 
 class MissionLogicNode(Node):
@@ -87,24 +58,18 @@ class MissionLogicNode(Node):
 
         # ── Parameters ────────────────────────────────────────────────────────
         self.declare_parameter("drone_id",         "d1")
-        self.declare_parameter("mission_duration", 600.0)
+        self.declare_parameter("mission_duration", MISSION_DURATION)
         self.declare_parameter("num_drones",        4)
-        self.declare_parameter("drone_index",       0)    # 0-based position in team
-        self.declare_parameter("grid_cols",         2)
-        self.declare_parameter("grid_rows",         2)
-        self.declare_parameter("arena_width",       30.0)
-        self.declare_parameter("arena_height",      30.0)
+        self.declare_parameter("arena_width",       ARENA_WIDTH)
+        self.declare_parameter("arena_height",      ARENA_HEIGHT)
 
         self.drone_id        = self.get_parameter("drone_id").value
         mission_duration     = self.get_parameter("mission_duration").value
         self.num_drones      = self.get_parameter("num_drones").value
-        drone_index          = self.get_parameter("drone_index").value
-        grid_cols            = self.get_parameter("grid_cols").value
-        grid_rows            = self.get_parameter("grid_rows").value
         arena_w              = self.get_parameter("arena_width").value
         arena_h              = self.get_parameter("arena_height").value
 
-        # Arena bounds (needed by GeofenceGuardNode)
+        # Arena bounds (full arena for all drones; Kevin's A* handles exploration)
         self.arena_w = arena_w
         self.arena_h = arena_h
 
@@ -112,13 +77,16 @@ class MissionLogicNode(Node):
         self.sm = StateMachine(self.drone_id, mission_duration)
         self.sm.on_transition(self._on_state_transition)
 
-        self.mission_start: Optional[float] = None   # set on first SURVEY enter
+        self.mission_start: Optional[float] = None   # set on BOOT→SURVEY transition
         self.mission_duration = mission_duration
 
-        # Sector this drone is responsible for
-        self.sector = assign_sector(
-            drone_index, self.num_drones,
-            grid_cols, grid_rows, arena_w, arena_h)
+        # All drones share identical full-arena bounds; Kevin's explorer does path planning
+        self.sector = {
+            "x_min": 0.0,     "x_max": arena_w,
+            "y_min": 0.0,     "y_max": arena_h,
+            "cx":    arena_w / 2,
+            "cy":    arena_h / 2,
+        }
 
         # Own pose (updated from PoseBeacon; needed by collision/geofence guards)
         self.own_x: float = 0.0
@@ -200,7 +168,8 @@ class MissionLogicNode(Node):
 
         self.get_logger().info(
             f"[{self.drone_id}] mission_logic_node ready | "
-            f"sector={self.sector}")
+            f"arena={arena_w:.2f}x{arena_h:.2f}m | "
+            f"mission_duration={mission_duration:.0f}s")
 
     # ── Team awareness ────────────────────────────────────────────────────────
 
@@ -307,6 +276,17 @@ class MissionLogicNode(Node):
     # ── Main tick ─────────────────────────────────────────────────────────────
 
     def _tick(self):
+        # Prune drones not seen for > 5 s (dropout detection)
+        now = time.monotonic()
+        dropped = [did for did, t in self.team_last_seen.items()
+                   if now - t > 5.0]
+        for did in dropped:
+            self.team_last_seen.pop(did, None)
+            self.team_states.pop(did, None)
+            self.team_poses.pop(did, None)
+            self.get_logger().warn(
+                f"[{self.drone_id}] Drone {did} dropped out (no beacon for 5s)")
+
         mine_count, confirmed_count = self._mine_context()
 
         ctx = MissionContext(
@@ -355,6 +335,9 @@ class MissionLogicNode(Node):
         Loser                       → FILL_GAPS covering the assigned sector.
         Role not yet assigned       → AWAIT_PATH_VERIFY (waiting for auction).
         """
+        if self.sm.state != "PATH_VERIFY":
+            return
+
         if not self._path_task_announced:
             self._path_task_announced = True
             self._path_task_id = f"become_pv_{self.drone_id}_0"
@@ -440,8 +423,8 @@ class MissionLogicNode(Node):
          100 = mine confirmed
         """
         resolution = 0.5   # metres per cell
-        width_cells  = int(self.sector["x_max"] - self.sector["x_min"]) * 2
-        height_cells = int(self.sector["y_max"] - self.sector["y_min"]) * 2
+        width_cells  = int(self.arena_w / resolution)
+        height_cells = int(self.arena_h / resolution)
 
         grid = OccupancyGrid()
         grid.header.stamp    = self.get_clock().now().to_msg()
@@ -449,8 +432,8 @@ class MissionLogicNode(Node):
         grid.info.resolution = resolution
         grid.info.width      = width_cells
         grid.info.height     = height_cells
-        grid.info.origin.position.x = self.sector["x_min"]
-        grid.info.origin.position.y = self.sector["y_min"]
+        grid.info.origin.position.x = 0.0
+        grid.info.origin.position.y = 0.0
 
         # Default: all safe
         data = [0] * (width_cells * height_cells)
@@ -458,8 +441,8 @@ class MissionLogicNode(Node):
         # Mark confirmed mines as occupied
         for b in self.mine_beliefs.values():
             if b["status"] == "confirmed":
-                cx = int((b["x"] - self.sector["x_min"]) / resolution)
-                cy = int((b["y"] - self.sector["y_min"]) / resolution)
+                cx = int(b["x"] / resolution)
+                cy = int(b["y"] / resolution)
                 if 0 <= cx < width_cells and 0 <= cy < height_cells:
                     data[cy * width_cells + cx] = 100
 
@@ -498,6 +481,11 @@ class MissionLogicNode(Node):
         self.get_logger().info(
             f"[{self.drone_id}] State: {from_state} → {to_state} "
             f"(t_remaining={self._time_remaining():.0f}s)")
+
+        if from_state == "BOOT" and to_state == "SURVEY":
+            self.mission_start = time.monotonic()
+            self.get_logger().info(
+                f"[{self.drone_id}] Mission timer started")
 
         if to_state == "SURVEY":
             # Reset PATH_VERIFY state so re-entry works correctly
